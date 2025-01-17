@@ -21,6 +21,7 @@
     background-color: transparent;
     color: #fff;
   }
+
   .vjs-theme-fantasy .vjs-control-bar {
     height: 54px;
   }
@@ -72,6 +73,7 @@
     border-radius: 0.8em;
     top: -0.25em;
   }
+
   .vjs-theme-fantasy .vjs-progress-control {
     font-size: 14px;
   }
