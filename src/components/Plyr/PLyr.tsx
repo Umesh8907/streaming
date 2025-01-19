@@ -1,94 +1,147 @@
 "use client";
-
 import React, { useEffect, useRef, useState } from "react";
-import dynamic from "next/dynamic";
+import Hls from "hls.js";
 import "plyr/dist/plyr.css";
+import { CgSpinner } from "react-icons/cg";
 
-import Plyr from "plyr";
+interface VideoPlayerProps {
+  src: string; // URL to the master.m3u8 file
+  thumbnail: string; // URL to the thumbnail image
+  onVideoProgress: (percentage: number) => void; // Callback function for progress
+}
 
-type VideoPlayerProps = {
-  sources: {
-    default: string; // Default source (main.m3u8)
-    qualities: { [quality: string]: string }; // Object mapping quality (e.g., 720) to m3u8 file
-  };
-};
-
-const VideoPlayer: React.FC<VideoPlayerProps> = ({ sources }) => {
-  const playerRef = useRef<HTMLVideoElement | null>(null);
-  const [player, setPlayer] = useState<Plyr | null>(null);
+const PlyrPlayer: React.FC<VideoPlayerProps> = ({
+  src,
+  thumbnail,
+  onVideoProgress,
+}) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const playerRef = useRef<Plyr | null>(null); // Store Plyr instance here
+  const [isPlayerReady, setIsPlayerReady] = useState(false);
 
   useEffect(() => {
-    let plyrInstance: Plyr | null = null;
+    const loadPlyr = async () => {
+      const video = videoRef.current;
+      if (!video) return;
 
-    if (playerRef.current) {
-      console.log("Initializing Plyr...");
-      plyrInstance = new Plyr(playerRef.current, {
-        settings: ["quality"],
-        quality: {
-          default: Number(Object.keys(sources.qualities)[0]), // Default quality
-          options: Object.keys(sources.qualities).map((q) => Number(q)),
-          forced: true,
-        },
-      });
+      const Plyr = (await import("plyr")).default; // Dynamically import Plyr
 
-      plyrInstance.on("ready", () => {
-        console.log("Plyr is ready!");
-      });
-
-      plyrInstance.on("qualitychange", (event: any) => {
-        console.log("Quality changed to:", event.detail.quality);
-        handleQualityChange(event.detail.quality);
-      });
-
-      setPlayer(plyrInstance);
-    }
-
-    // Cleanup Plyr on component unmount
-    return () => {
-      if (plyrInstance && typeof plyrInstance.destroy === "function") {
-        console.log("Destroying Plyr instance...");
-        plyrInstance.destroy();
-      }
-    };
-  }, [sources]);
-
-  const handleQualityChange = (newQuality: number) => {
-    if (!player) return;
-
-    const currentTime = player.currentTime;
-    const selectedSource = sources.qualities[newQuality.toString()];
-
-    if (selectedSource) {
-      console.log("Changing source to:", selectedSource);
-
-      player.source = {
-        type: "video",
-        sources: [
-          {
-            src: selectedSource,
-            type: "application/x-mpegURL",
-            size: newQuality,
-          },
+      const defaultOptions: Plyr.Options = {
+        controls: [
+          "play-large",
+          "play",
+          "progress",
+          "current-time",
+          "mute",
+          "volume",
+          "captions",
+          "settings",
+          "fullscreen",
         ],
+        settings: ["quality", "speed"],
       };
 
-      player.currentTime = currentTime; // Resume playback at the current time
-      player.play();
-    }
-  };
+      let hls: Hls | null = null;
+
+      // Only initialize the player if it's not already initialized
+      if (!playerRef.current) {
+        if (Hls.isSupported() && src.endsWith(".m3u8")) {
+          hls = new Hls();
+          hls.loadSource(src);
+
+          hls.on(Hls.Events.MANIFEST_PARSED, function () {
+            const availableQualities = hls.levels.map((level) => level.height);
+            availableQualities.unshift(0); // Add "Auto" to the quality list
+
+            defaultOptions.quality = {
+              default: 0,
+              options: availableQualities,
+              forced: true,
+              onChange: (newQuality) => updateQuality(newQuality),
+            };
+
+            defaultOptions.i18n = {
+              qualityLabel: {
+                0: "Auto",
+              },
+            };
+
+            hls.on(Hls.Events.LEVEL_SWITCHED, function (_, data) {
+              const autoLabel = document.querySelector(
+                ".plyr__menu__container [data-plyr='quality'][value='0'] span"
+              );
+              if (autoLabel) {
+                autoLabel.textContent = hls.autoLevelEnabled
+                  ? `AUTO (${hls.levels[data.level].height}p)`
+                  : "AUTO";
+              }
+            });
+
+            // Initialize Plyr with the updated quality options
+            playerRef.current = new Plyr(video, defaultOptions);
+            setIsPlayerReady(true); // Mark the player as ready
+          });
+
+          hls.attachMedia(video);
+          (window as any).hls = hls; // Expose HLS instance for debugging
+        } else {
+          playerRef.current = new Plyr(video, defaultOptions); // Fallback for browsers with native HLS support
+          video.src = src;
+          setIsPlayerReady(true); // Mark the player as ready
+        }
+      }
+
+      function updateQuality(newQuality: number) {
+        if (!hls) return;
+
+        if (newQuality === 0) {
+          hls.currentLevel = -1; // Enable AUTO quality
+        } else {
+          hls.levels.forEach((level, index) => {
+            if (level.height === newQuality) {
+              hls.currentLevel = index;
+            }
+          });
+        }
+      }
+
+      // Monitor video progress to send data to parent component
+      const onTimeUpdate = () => {
+        if (!video) return;
+        const percentage = (video.currentTime / video.duration) * 100;
+
+      
+        if (percentage >= 90) {
+          onVideoProgress(percentage); // Pass the percentage to the parent
+        }
+      };
+
+      // Add timeupdate event listener to track progress
+      video.addEventListener("timeupdate", onTimeUpdate);
+
+      return () => {
+        hls?.destroy();
+        playerRef.current?.destroy();
+        video.removeEventListener("timeupdate", onTimeUpdate); // Clean up event listener
+      };
+    };
+
+    loadPlyr();
+  }, [src]); // Only load Plyr when `src` changes, not `onVideoProgress`
 
   return (
-    <div>
+    <div className={`video-wrapper ${isPlayerReady ? "" : "loading"}`}>
       <video
-        ref={playerRef}
-        className="plyr__video-embed"
+        ref={videoRef}
+        className="plyr"
+        poster={thumbnail}
         controls
         crossOrigin="anonymous"
-      >
-        <source src={sources.default} type="application/x-mpegURL" />
-      </video>
+        style={{ visibility: isPlayerReady ? "visible" : "hidden" }}
+      ></video>
+      {!isPlayerReady && <CgSpinner className="animate-spin" />}
     </div>
   );
 };
 
-export default VideoPlayer;
+export default PlyrPlayer;

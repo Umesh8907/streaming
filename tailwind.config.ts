@@ -8,6 +8,11 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        alfa_regular: ['"Alfa-Regular"', "sans-serif"],
+        alfa_semibold: ['"Alfa-Semibold"', "sans-serif"],
+        alfa_bold: ['"Alfa-Bold"', "sans-serif"],
+      },
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",

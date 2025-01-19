@@ -1,4 +1,42 @@
+
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+
+@font-face {
+  font-family: 'Alfa-Regular';
+  src: url('/fonts/ApfelGrotezk-Regular.woff2') format('woff2'),
+       url('/fonts/ApfelGrotezk-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Alfa-Semibold';
+  src: url('/fonts/ApfelGrotezk-Semibold.woff2') format('woff2'),
+       url('/fonts/ApfelGrotezk-Semibold.woff') format('woff');
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Alfa-Bold';
+  src: url('/fonts/ApfelGrotezk-Bold.woff2') format('woff2'),
+       url('/fonts/ApfelGrotezk-Bold.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+}
+
+body {
+  font-family: 'Alfa-Regular', sans-serif;
+}
+
+@layer base {
+  :root {
+    --plyr-color-main: #852bd5;
+    --plyr-video-control-color: #ffffff;
+    --plyr-video-control-background: #852bd5;
+  }
+}
