@@ -2,12 +2,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import "plyr/dist/plyr.css";
-import { CgSpinner } from "react-icons/cg";
+
 
 interface VideoPlayerProps {
-  src: string; // URL to the master.m3u8 file
-  thumbnail: string; // URL to the thumbnail image
-  onVideoProgress: (percentage: number) => void; // Callback function for progress
+  src: string; 
+  thumbnail: string; 
+  onVideoProgress: (percentage: number) => void; 
 }
 
 const PlyrPlayer: React.FC<VideoPlayerProps> = ({
@@ -16,17 +16,15 @@ const PlyrPlayer: React.FC<VideoPlayerProps> = ({
   onVideoProgress,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const playerRef = useRef<Plyr | null>(null); // Store Plyr instance here
+  const playerRef = useRef<Plyr | null>(null);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
 
   useEffect(() => {
-    // Check if video reference is available
     const video = videoRef.current;
     if (!video) return;
 
-    // Initialize the player when the src is set
     const loadPlyr = async () => {
-      const Plyr = (await import("plyr")).default; // Dynamically import Plyr
+      const Plyr = (await import("plyr")).default;
 
       const defaultOptions: Plyr.Options = {
         controls: [
@@ -45,18 +43,16 @@ const PlyrPlayer: React.FC<VideoPlayerProps> = ({
 
       let hls: Hls | null = null;
 
-      // Destroy previous instance if exists
       if (playerRef.current) {
         playerRef.current.destroy();
         playerRef.current = null;
       }
 
-      // Only initialize the player if it's not already initialized
       if (Hls.isSupported() && src.endsWith(".m3u8")) {
         hls = new Hls();
         hls.loadSource(src);
 
-        hls.on(Hls.Events.MANIFEST_PARSED, function () {
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
           const availableQualities = hls.levels.map((level) => level.height);
           availableQualities.unshift(0); // Add "Auto" to the quality list
 
@@ -73,7 +69,7 @@ const PlyrPlayer: React.FC<VideoPlayerProps> = ({
             },
           };
 
-          hls.on(Hls.Events.LEVEL_SWITCHED, function (_, data) {
+          hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
             const autoLabel = document.querySelector(
               ".plyr__menu__container [data-plyr='quality'][value='0'] span"
             );
@@ -84,17 +80,16 @@ const PlyrPlayer: React.FC<VideoPlayerProps> = ({
             }
           });
 
-          // Initialize Plyr with the updated quality options
           playerRef.current = new Plyr(video, defaultOptions);
-          setIsPlayerReady(true); // Mark the player as ready
+          setIsPlayerReady(true);
         });
 
         hls.attachMedia(video);
-        (window as any).hls = hls; // Expose HLS instance for debugging
+        (window as any).hls = hls;
       } else {
-        playerRef.current = new Plyr(video, defaultOptions); // Fallback for browsers with native HLS support
+        playerRef.current = new Plyr(video, defaultOptions);
         video.src = src;
-        setIsPlayerReady(true); // Mark the player as ready
+        setIsPlayerReady(true);
       }
 
       function updateQuality(newQuality: number) {
@@ -111,40 +106,38 @@ const PlyrPlayer: React.FC<VideoPlayerProps> = ({
         }
       }
 
-      // Monitor video progress to send data to parent component
       const onTimeUpdate = () => {
         if (!video) return;
         const percentage = (video.currentTime / video.duration) * 100;
-
         if (percentage >= 90) {
-          onVideoProgress(percentage); // Pass the percentage to the parent
+          onVideoProgress(percentage);
         }
       };
 
-      // Add timeupdate event listener to track progress
       video.addEventListener("timeupdate", onTimeUpdate);
 
       return () => {
         hls?.destroy();
         playerRef.current?.destroy();
-        video.removeEventListener("timeupdate", onTimeUpdate); // Clean up event listener
+        video.removeEventListener("timeupdate", onTimeUpdate);
       };
     };
 
+    setIsPlayerReady(false);
     loadPlyr();
-  }, [src]); // Trigger this effect whenever the `src` changes
+  }, [src]);
 
   return (
-    <div className={`video-wrapper ${isPlayerReady ? "" : "loading"}`}>
+    <div className="video-wrapper relative">
       <video
         ref={videoRef}
         className="plyr"
         poster={thumbnail}
         controls
         crossOrigin="anonymous"
-        style={{ visibility: isPlayerReady ? "visible" : "hidden" }}
       ></video>
-      {!isPlayerReady && <CgSpinner className="animate-spin" />}
+
+    
     </div>
   );
 };
