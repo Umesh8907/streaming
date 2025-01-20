@@ -20,10 +20,12 @@ const PlyrPlayer: React.FC<VideoPlayerProps> = ({
   const [isPlayerReady, setIsPlayerReady] = useState(false);
 
   useEffect(() => {
-    const loadPlyr = async () => {
-      const video = videoRef.current;
-      if (!video) return;
+    // Check if video reference is available
+    const video = videoRef.current;
+    if (!video) return;
 
+    // Initialize the player when the src is set
+    const loadPlyr = async () => {
       const Plyr = (await import("plyr")).default; // Dynamically import Plyr
 
       const defaultOptions: Plyr.Options = {
@@ -43,52 +45,56 @@ const PlyrPlayer: React.FC<VideoPlayerProps> = ({
 
       let hls: Hls | null = null;
 
+      // Destroy previous instance if exists
+      if (playerRef.current) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+
       // Only initialize the player if it's not already initialized
-      if (!playerRef.current) {
-        if (Hls.isSupported() && src.endsWith(".m3u8")) {
-          hls = new Hls();
-          hls.loadSource(src);
+      if (Hls.isSupported() && src.endsWith(".m3u8")) {
+        hls = new Hls();
+        hls.loadSource(src);
 
-          hls.on(Hls.Events.MANIFEST_PARSED, function () {
-            const availableQualities = hls.levels.map((level) => level.height);
-            availableQualities.unshift(0); // Add "Auto" to the quality list
+        hls.on(Hls.Events.MANIFEST_PARSED, function () {
+          const availableQualities = hls.levels.map((level) => level.height);
+          availableQualities.unshift(0); // Add "Auto" to the quality list
 
-            defaultOptions.quality = {
-              default: 0,
-              options: availableQualities,
-              forced: true,
-              onChange: (newQuality) => updateQuality(newQuality),
-            };
+          defaultOptions.quality = {
+            default: 0,
+            options: availableQualities,
+            forced: true,
+            onChange: (newQuality) => updateQuality(newQuality),
+          };
 
-            defaultOptions.i18n = {
-              qualityLabel: {
-                0: "Auto",
-              },
-            };
+          defaultOptions.i18n = {
+            qualityLabel: {
+              0: "Auto",
+            },
+          };
 
-            hls.on(Hls.Events.LEVEL_SWITCHED, function (_, data) {
-              const autoLabel = document.querySelector(
-                ".plyr__menu__container [data-plyr='quality'][value='0'] span"
-              );
-              if (autoLabel) {
-                autoLabel.textContent = hls.autoLevelEnabled
-                  ? `AUTO (${hls.levels[data.level].height}p)`
-                  : "AUTO";
-              }
-            });
-
-            // Initialize Plyr with the updated quality options
-            playerRef.current = new Plyr(video, defaultOptions);
-            setIsPlayerReady(true); // Mark the player as ready
+          hls.on(Hls.Events.LEVEL_SWITCHED, function (_, data) {
+            const autoLabel = document.querySelector(
+              ".plyr__menu__container [data-plyr='quality'][value='0'] span"
+            );
+            if (autoLabel) {
+              autoLabel.textContent = hls.autoLevelEnabled
+                ? `AUTO (${hls.levels[data.level].height}p)`
+                : "AUTO";
+            }
           });
 
-          hls.attachMedia(video);
-          (window as any).hls = hls; // Expose HLS instance for debugging
-        } else {
-          playerRef.current = new Plyr(video, defaultOptions); // Fallback for browsers with native HLS support
-          video.src = src;
+          // Initialize Plyr with the updated quality options
+          playerRef.current = new Plyr(video, defaultOptions);
           setIsPlayerReady(true); // Mark the player as ready
-        }
+        });
+
+        hls.attachMedia(video);
+        (window as any).hls = hls; // Expose HLS instance for debugging
+      } else {
+        playerRef.current = new Plyr(video, defaultOptions); // Fallback for browsers with native HLS support
+        video.src = src;
+        setIsPlayerReady(true); // Mark the player as ready
       }
 
       function updateQuality(newQuality: number) {
@@ -110,7 +116,6 @@ const PlyrPlayer: React.FC<VideoPlayerProps> = ({
         if (!video) return;
         const percentage = (video.currentTime / video.duration) * 100;
 
-      
         if (percentage >= 90) {
           onVideoProgress(percentage); // Pass the percentage to the parent
         }
@@ -127,7 +132,7 @@ const PlyrPlayer: React.FC<VideoPlayerProps> = ({
     };
 
     loadPlyr();
-  }, [src]); // Only load Plyr when `src` changes, not `onVideoProgress`
+  }, [src]); // Trigger this effect whenever the `src` changes
 
   return (
     <div className={`video-wrapper ${isPlayerReady ? "" : "loading"}`}>
